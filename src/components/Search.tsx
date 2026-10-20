@@ -1,5 +1,99 @@
-import {useEffect,useRef,useState} from 'react';
-import {Search as SearchIcon,FileText,X} from 'lucide-react';
-import {api} from '../core/bridge';
-import type {Note} from '../core/model';
-export function Search({onClose,onOpen}:{onClose:()=>void;onOpen:(n:Note)=>void}){const [query,setQuery]=useState(''),[results,setResults]=useState<Note[]>([]),[error,setError]=useState('');const input=useRef<HTMLInputElement>(null);useEffect(()=>{input.current?.focus();const close=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};document.addEventListener('keydown',close);return()=>document.removeEventListener('keydown',close);},[onClose]);useEffect(()=>{let cancelled=false;const timer=setTimeout(()=>{api.search(query).then(n=>{if(!cancelled)setResults(n.slice(0,60));}).catch(e=>{if(!cancelled)setError(String(e));});},150);return()=>{cancelled=true;clearTimeout(timer);};},[query]);return <div className="modal-overlay" onMouseDown={onClose}><section className="search-dialog" role="dialog" aria-modal="true" aria-label="Поиск по хранилищу" onMouseDown={e=>e.stopPropagation()}><div className="search-input"><SearchIcon size={20}/><input ref={input} aria-label="Поиск по хранилищу" placeholder="Найти в страницах, тексте и тегах…" value={query} onChange={e=>setQuery(e.target.value)}/><button className="icon-button" aria-label="Закрыть поиск" onClick={onClose}><X size={17}/></button></div><div className="search-results">{error?<p className="inline-warning">{error}</p>:results.length?results.map(n=><button key={n.path} onClick={()=>{onOpen(n);onClose();}}><FileText size={19}/><div><strong>{n.title}</strong><p>{n.excerpt.slice(0,130)}</p><small>{n.path}</small></div></button>):<div className="empty-state"><p>{query?'Ничего не найдено':'Начните вводить запрос'}</p></div>}</div><footer>Поиск работает локально <span>esc — закрыть</span></footer></section></div>;}
+import { useEffect, useRef, useState } from "react";
+import { Search as SearchIcon, FileText, X } from "lucide-react";
+import { api } from "../core/bridge";
+import type { Note } from "../core/model";
+export function Search({
+  onClose,
+  onOpen,
+}: {
+  onClose: () => void;
+  onOpen: (n: Note) => void;
+}) {
+  const [query, setQuery] = useState(""),
+    [results, setResults] = useState<Note[]>([]),
+    [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    input.current?.focus();
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [onClose]);
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .search(query)
+        .then((n) => {
+          if (!cancelled) setResults(n.slice(0, 60));
+        })
+        .catch((e) => {
+          if (!cancelled) setError(String(e));
+        });
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+  return (
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <section
+        className="search-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Поиск по хранилищу"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="search-input">
+          <SearchIcon size={20} />
+          <input
+            ref={input}
+            aria-label="Поиск по хранилищу"
+            placeholder="Найти в страницах, тексте и тегах…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button
+            className="icon-button"
+            aria-label="Закрыть поиск"
+            onClick={onClose}
+          >
+            <X size={17} />
+          </button>
+        </div>
+        <div className="search-results">
+          {error ? (
+            <p className="inline-warning">{error}</p>
+          ) : results.length ? (
+            results.map((n) => (
+              <button
+                key={n.path}
+                onClick={() => {
+                  onOpen(n);
+                  onClose();
+                }}
+              >
+                <FileText size={19} />
+                <div>
+                  <strong>{n.title}</strong>
+                  <p>{n.excerpt.slice(0, 130)}</p>
+                  <small>{n.path}</small>
+                </div>
+              </button>
+            ))
+          ) : (
+            <div className="empty-state">
+              <p>{query ? "Ничего не найдено" : "Начните вводить запрос"}</p>
+            </div>
+          )}
+        </div>
+        <footer>
+          Поиск работает локально <span>esc — закрыть</span>
+        </footer>
+      </section>
+    </div>
+  );
+}

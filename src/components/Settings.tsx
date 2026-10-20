@@ -1,3 +1,114 @@
-import {FolderOpen,Sun,Moon,Monitor,RefreshCw,HardDrive} from 'lucide-react';
-import {api} from '../core/bridge';
-export function Settings({root,theme,onTheme,onOpen,onError}:{root:string;theme:string;onTheme:(s:string)=>void;onOpen:()=>void;onError:(e:unknown)=>void}){return <div className="settings-page"><h1>Настройки</h1><p className="muted">Ваши файлы, привычный рабочий ритм.</p><section><h2>Хранилище</h2><div className="setting-row"><HardDrive size={20}/><div><strong>Локальная папка</strong><p className="path-text">{root||'Папка ещё не выбрана'}</p></div><button className="quiet-button" onClick={onOpen}><FolderOpen size={16}/>Выбрать</button></div>{root?<button className="quiet-button" onClick={()=>void api.reveal().catch(onError)}>Показать в Finder</button>:null}</section><section><h2>Оформление</h2><div className="theme-options">{[['system','Как в системе',Monitor],['light','Светлая',Sun],['dark','Тёмная',Moon]].map(([id,label,Icon])=>{const I=Icon as typeof Sun;return <button key={String(id)} className={theme===id?'selected':''} onClick={()=>onTheme(String(id))}><I size={22}/>{String(label)}</button>;})}</div></section><section><h2>Данные и восстановление</h2><div className="setting-row"><div><strong>Исходные файлы</strong><p>Страницы — Markdown, свойства — YAML, вложения — отдельные файлы. Лимита приложения на размер медиа нет.</p></div></div><div className="setting-row"><div><strong>Поисковый индекс</strong><p>Его можно построить заново из файлов. Заметки и вложения сохраняются.</p></div><button className="quiet-button" disabled={!root} onClick={()=>void api.rebuild().catch(onError)}><RefreshCw size={15}/>Перестроить</button></div><div className="setting-row"><div><strong>История страниц</strong><p>Предыдущие версии доступны из открытой страницы. Корзина не очищается автоматически.</p></div></div></section><footer className="settings-footer">Local Notes · 0.1.0 · Локальная версия для Mac</footer></div>;}
+import {
+  FolderOpen,
+  Sun,
+  Moon,
+  Monitor,
+  RefreshCw,
+  HardDrive,
+} from "lucide-react";
+import { api } from "../core/bridge";
+export function Settings({
+  root,
+  theme,
+  onTheme,
+  onOpen,
+  onError,
+}: {
+  root: string;
+  theme: string;
+  onTheme: (s: string) => void;
+  onOpen: () => void;
+  onError: (e: unknown) => void;
+}) {
+  return (
+    <div className="settings-page">
+      <h1>Настройки</h1>
+      <p className="muted">Ваши файлы, привычный рабочий ритм.</p>
+      <section>
+        <h2>Хранилище</h2>
+        <div className="setting-row">
+          <HardDrive size={20} />
+          <div>
+            <strong>Локальная папка</strong>
+            <p className="path-text">{root || "Папка ещё не выбрана"}</p>
+          </div>
+          <button className="quiet-button" onClick={onOpen}>
+            <FolderOpen size={16} />
+            Выбрать
+          </button>
+        </div>
+        {root ? (
+          <button
+            className="quiet-button"
+            onClick={() => void api.reveal().catch(onError)}
+          >
+            Показать в Finder
+          </button>
+        ) : null}
+      </section>
+      <section>
+        <h2>Оформление</h2>
+        <div className="theme-options">
+          {[
+            ["system", "Как в системе", Monitor],
+            ["light", "Светлая", Sun],
+            ["dark", "Тёмная", Moon],
+          ].map(([id, label, Icon]) => {
+            const I = Icon as typeof Sun;
+            return (
+              <button
+                key={String(id)}
+                className={theme === id ? "selected" : ""}
+                onClick={() => onTheme(String(id))}
+              >
+                <I size={22} />
+                {String(label)}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+      <section>
+        <h2>Данные и восстановление</h2>
+        <div className="setting-row">
+          <div>
+            <strong>Исходные файлы</strong>
+            <p>
+              Страницы — Markdown, свойства — YAML, вложения — отдельные файлы.
+              Лимита приложения на размер медиа нет.
+            </p>
+          </div>
+        </div>
+        <div className="setting-row">
+          <div>
+            <strong>Поисковый индекс</strong>
+            <p>
+              Его можно построить заново из файлов. Заметки и вложения
+              сохраняются.
+            </p>
+          </div>
+          <button
+            className="quiet-button"
+            disabled={!root}
+            onClick={() => void api.rebuild().catch(onError)}
+          >
+            <RefreshCw size={15} />
+            Перестроить
+          </button>
+        </div>
+        <div className="setting-row">
+          <div>
+            <strong>История страниц</strong>
+            <p>
+              Предыдущие версии доступны из открытой страницы. Корзина не
+              очищается автоматически.
+            </p>
+          </div>
+        </div>
+      </section>
+      <footer className="settings-footer">
+        Local Notes · 0.1.0 · Локальная версия для Mac
+      </footer>
+    </div>
+  );
+}

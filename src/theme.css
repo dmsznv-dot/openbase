@@ -1,1 +1,58 @@
-:root{color-scheme:light;--paper:#fdfcf9;--sidebar:#f1f0ec;--text:#30352f;--sidebar-text:#575b53;--muted:#73776e;--placeholder:#81857b;--line:#e8e7e0;--line-strong:#cecec4;--hover:#eeeee7;--sidebar-selected:#e2e5db;--accent:#4f6d54;--accent-hover:#3e5942;--accent-text:#fff;--selection:#e3ebdf;--tag:#eceee6;--tag-text:#626d58;--code:#efeee8;--scrollbar:#cfcec5;--board:#f3f2ed;--warning:#9a722e;--error-text:#8d4c30;--error-bg:#f8eee5;--graph-bg:#fafbf7;--graph-label:#fafbf7e8;--graph-link:#879583;--graph-tag:#a8b89b}html[data-theme=dark]{color-scheme:dark;--paper:#20231f;--sidebar:#1b1e1a;--text:#e1e5dc;--sidebar-text:#c1c6b9;--muted:#a1a797;--placeholder:#929b88;--line:#34392e;--line-strong:#4b5343;--hover:#2b3027;--sidebar-selected:#333d2e;--accent:#a1bc8f;--accent-hover:#b2cba2;--accent-text:#20271b;--selection:#36442e;--tag:#333c2c;--tag-text:#bccdaf;--code:#191d17;--scrollbar:#414a39;--board:#242920;--warning:#d5b377;--error-text:#edc3a6;--error-bg:#443329;--graph-bg:#1d221b;--graph-label:#1d221be8;--graph-link:#7f8e74;--graph-tag:#596c48}
+:root {
+  color-scheme: light;
+  --paper: #fdfcf9;
+  --sidebar: #f1f0ec;
+  --text: #30352f;
+  --sidebar-text: #575b53;
+  --muted: #686e61;
+  --placeholder: #6e7566;
+  --line: #e8e7e0;
+  --line-strong: #cecec4;
+  --hover: #eeeee7;
+  --sidebar-selected: #e2e5db;
+  --accent: #4f6d54;
+  --accent-hover: #3e5942;
+  --accent-text: #fff;
+  --selection: #e3ebdf;
+  --tag: #eceee6;
+  --tag-text: #626d58;
+  --code: #efeee8;
+  --scrollbar: #cfcec5;
+  --board: #f3f2ed;
+  --warning: #9a722e;
+  --error-text: #8d4c30;
+  --error-bg: #f8eee5;
+  --graph-bg: #fafbf7;
+  --graph-label: #fafbf7e8;
+  --graph-link: #879583;
+  --graph-tag: #a8b89b;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #20231f;
+  --sidebar: #1b1e1a;
+  --text: #e1e5dc;
+  --sidebar-text: #c1c6b9;
+  --muted: #a1a797;
+  --placeholder: #929b88;
+  --line: #34392e;
+  --line-strong: #4b5343;
+  --hover: #2b3027;
+  --sidebar-selected: #333d2e;
+  --accent: #a1bc8f;
+  --accent-hover: #b2cba2;
+  --accent-text: #20271b;
+  --selection: #36442e;
+  --tag: #333c2c;
+  --tag-text: #bccdaf;
+  --code: #191d17;
+  --scrollbar: #414a39;
+  --board: #242920;
+  --warning: #d5b377;
+  --error-text: #edc3a6;
+  --error-bg: #443329;
+  --graph-bg: #1d221b;
+  --graph-label: #1d221be8;
+  --graph-link: #7f8e74;
+  --graph-tag: #596c48;
+}

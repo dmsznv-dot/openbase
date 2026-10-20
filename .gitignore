@@ -7,3 +7,8 @@ artifacts/
 *.log
 .DS_Store
 *.tsbuildinfo
+
+src-tauri/gen/
+src-tauri/icons/*
+!src-tauri/icons/icon.png
+!src-tauri/icons/icon.icns
