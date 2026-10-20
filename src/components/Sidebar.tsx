@@ -1,4 +1,5 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { PageMenu } from "./PageMenu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Search,
@@ -10,6 +11,7 @@ import {
   FolderOpen,
   ChevronDown,
   Star,
+  MoreHorizontal,
 } from "lucide-react";
 import type { Note, DataView } from "../core/model";
 export function Sidebar({
@@ -26,6 +28,9 @@ export function Sidebar({
   onNewView,
   onOpenVault,
   onSearch,
+  onRename,
+  onFavorite,
+  onRemove,
 }: {
   root: string;
   notes: Note[];
@@ -40,7 +45,46 @@ export function Sidebar({
   onNewView: () => void;
   onOpenVault: () => void;
   onSearch: () => void;
+  onRename: (note: Note, title: string) => void;
+  onFavorite: (note: Note) => void;
+  onRemove: (note: Note) => void;
 }) {
+  const [menu, setMenu] = useState<{
+    path: string;
+    anchor: HTMLElement;
+  } | null>(null);
+  const menuNote = notes.find((n) => n.path === menu?.path);
+  const pageRow = (n: Note, style?: CSSProperties, favorite = false) => (
+    <div
+      key={n.path}
+      style={style}
+      className={
+        "sidebar-page-row " +
+        (screen === "page" && current === n.path ? "active " : "") +
+        (menu?.path === n.path ? "menu-open" : "")
+      }
+    >
+      <button className="sidebar-page-open" onClick={() => onOpen(n)}>
+        {favorite ? <Star size={14} /> : <FileText size={15} />}
+        <span>{n.title}</span>
+      </button>
+      <button
+        className="sidebar-page-more"
+        aria-label={"Меню страницы " + n.title}
+        aria-haspopup="menu"
+        aria-expanded={menu?.path === n.path}
+        onClick={(e) =>
+          setMenu(
+            menu?.path === n.path
+              ? null
+              : { path: n.path, anchor: e.currentTarget },
+          )
+        }
+      >
+        <MoreHorizontal size={16} />
+      </button>
+    </div>
+  );
   const scroll = useRef<HTMLDivElement>(null);
   const flat = useMemo(() => {
     const byParent = new Map<string, Note[]>();
@@ -112,18 +156,7 @@ export function Sidebar({
           {notes
             .filter((n) => n.favorite)
             .slice(0, 8)
-            .map((n) => (
-              <button
-                key={n.path}
-                className={
-                  screen === "page" && current === n.path ? "active" : ""
-                }
-                onClick={() => onOpen(n)}
-              >
-                <Star size={14} />
-                <span>{n.title}</span>
-              </button>
-            ))}
+            .map((n) => pageRow(n, undefined, true))}
         </div>
       ) : null}
       <div className="sidebar-section">
@@ -170,27 +203,15 @@ export function Sidebar({
           <div style={{ height: virtual.getTotalSize(), position: "relative" }}>
             {virtual.getVirtualItems().map((item) => {
               const { note: n, depth } = flat[item.index];
-              return (
-                <button
-                  key={n.path}
-                  className={
-                    screen === "page" && current === n.path ? "active" : ""
-                  }
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: 33,
-                    transform: `translateY(${item.start}px)`,
-                    paddingLeft: 12 + depth * 13,
-                  }}
-                  onClick={() => onOpen(n)}
-                >
-                  <FileText size={15} />
-                  <span>{n.title}</span>
-                </button>
-              );
+              return pageRow(n, {
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: 33,
+                transform: `translateY(${item.start}px)`,
+                paddingLeft: depth * 13,
+              });
             })}
           </div>
           {!notes.length ? (
@@ -220,6 +241,17 @@ export function Sidebar({
           <FolderOpen size={13} />
         </div>
       </footer>
+      {menu && menuNote ? (
+        <PageMenu
+          key={menuNote.path}
+          note={menuNote}
+          anchor={menu.anchor}
+          onClose={() => setMenu(null)}
+          onRename={onRename}
+          onFavorite={onFavorite}
+          onRemove={onRemove}
+        />
+      ) : null}
     </aside>
   );
 }

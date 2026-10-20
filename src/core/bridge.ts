@@ -112,6 +112,8 @@ async function call<T>(
       break;
     case "create_note": {
       const d = sample(String(args.title), [], "");
+      d.parent_id = typeof args.parent === "string" ? args.parent : null;
+      d.properties.localnotes = { id: d.id, parent_id: d.parent_id };
       demoDocs.push(d);
       result = d;
       break;
@@ -126,7 +128,14 @@ async function call<T>(
         content: String(args.content),
         raw: String(args.content),
         revision: crypto.randomUUID(),
-        properties: { ...d.properties, ...props },
+        properties: {
+          ...d.properties,
+          ...props,
+          localnotes: {
+            ...((d.properties.localnotes as object) ?? {}),
+            ...((props?.localnotes as object) ?? {}),
+          },
+        },
         title: String(props?.title ?? d.title),
         tags: Array.isArray(props?.tags) ? (props.tags as string[]) : d.tags,
         updated: Date.now() / 1000,

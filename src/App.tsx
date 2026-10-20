@@ -19,6 +19,7 @@ import { Editor } from "./components/Editor";
 import { DataViews } from "./components/DataViews";
 import { Settings } from "./components/Settings";
 import { Search } from "./components/Search";
+import { PageWorkspace } from "./components/PageWorkspace";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { api, native, type HistoryEntry, type TrashEntry } from "./core/bridge";
 import type { Note, DataView } from "./core/model";
@@ -59,6 +60,7 @@ export default function App() {
         setScreen("page");
         setHistory(null);
       }
+      return d;
     },
     [w.create],
   );
@@ -116,17 +118,7 @@ export default function App() {
       w.report(e);
     }
   };
-  const patchNote = async (n: Note, patch: Record<string, unknown>) => {
-    try {
-      await w.flush();
-      const d = await api.read(n.path);
-      const saved = await api.save(d, d.content, patch);
-      if (w.doc?.path === n.path) w.accept(saved);
-      await w.refresh();
-    } catch (e) {
-      w.report(e);
-    }
-  };
+  const patchNote = w.patchNote;
   const showHistory = async () => {
     if (!w.doc) return;
     try {
@@ -163,6 +155,11 @@ export default function App() {
         onNewView={() => void newView()}
         onOpenVault={() => void w.openVault()}
         onSearch={() => setSearch(true)}
+        onRename={(n, title) => void patchNote(n, { title })}
+        onFavorite={(n) =>
+          void patchNote(n, { localnotes: { favorite: !n.favorite } })
+        }
+        onRemove={(n) => void w.remove(n)}
       />
       <main className="main-panel">
         <header className="topbar" data-tauri-drag-region>
@@ -369,33 +366,47 @@ export default function App() {
               onOpen={(n) => void open(n)}
               onPatch={(n, p) => void patchNote(n, p)}
               onCreate={() => {
-                void create().then(() => {
-                  if (activeView.tags.length)
+                void create().then((d) => {
+                  if (d && activeView.tags.length)
                     w.patch({ tags: activeView.tags });
                 });
               }}
             />
           ) : w.doc ? (
-            <Editor
-              key={w.doc.path}
-              doc={w.doc}
-              draft={w.draft}
-              root={w.workspace?.root ?? ""}
+            <PageWorkspace
+              note={w.doc}
               notes={w.notes}
-              onChange={w.change}
               onPatch={w.patch}
               onOpen={(n) => void open(n)}
-              onError={w.report}
-              onHistory={() => void showHistory()}
-              onMove={async (path) => {
-                await w.flush();
-                const d = await api.read(w.doc!.path);
-                const moved = await api.move(d, path);
-                w.setTabs((t) => t.filter((n) => n.path !== d.path));
-                w.accept(moved);
-                await w.refresh();
-              }}
-            />
+              onPatchNote={(n, p) => void patchNote(n, p)}
+              onCreate={(parent, tags) =>
+                void create(parent).then((d) => {
+                  if (d && tags.length) w.patch({ tags });
+                })
+              }
+              onSwitch={(view) => void w.setPageView(view, w.doc!.path)}
+            >
+              <Editor
+                key={w.doc.path}
+                doc={w.doc}
+                draft={w.draft}
+                root={w.workspace?.root ?? ""}
+                notes={w.notes}
+                onChange={w.change}
+                onPatch={w.patch}
+                onOpen={(n) => void open(n)}
+                onError={w.report}
+                onHistory={() => void showHistory()}
+                onMove={async (path) => {
+                  await w.flush();
+                  const d = await api.read(w.doc!.path);
+                  const moved = await api.move(d, path);
+                  w.setTabs((t) => t.filter((n) => n.path !== d.path));
+                  w.accept(moved);
+                  await w.refresh();
+                }}
+              />
+            </PageWorkspace>
           ) : (
             <div className="welcome">
               <div className="welcome-mark">

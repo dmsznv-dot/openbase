@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { api, native, type WorkspaceInfo } from "../core/bridge";
 import { SaveQueue } from "../core/saveQueue";
-import type { Document, Note, DataView } from "../core/model";
+import {
+  pageViewPatch,
+  type Document,
+  type Note,
+  type DataView,
+  type PageView,
+} from "../core/model";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 const defaultView: DataView = {
   id: "all",
@@ -155,7 +161,23 @@ export function useWorkspace() {
           ...d,
           title: String(value.title ?? d.title),
           tags: Array.isArray(value.tags) ? (value.tags as string[]) : d.tags,
-          properties: { ...d.properties, ...value },
+          favorite:
+            typeof (value.localnotes as { favorite?: unknown } | undefined)
+              ?.favorite === "boolean"
+              ? (value.localnotes as { favorite: boolean }).favorite
+              : d.favorite,
+          properties: {
+            ...d.properties,
+            ...value,
+            ...(value.localnotes
+              ? {
+                  localnotes: {
+                    ...((d.properties.localnotes as object) ?? {}),
+                    ...(value.localnotes as object),
+                  },
+                }
+              : {}),
+          },
         };
         current.current = optimistic;
         setDoc(optimistic);
@@ -182,6 +204,38 @@ export function useWorkspace() {
       }
     },
     [flush, accept, report],
+  );
+  const setPageView = useCallback(
+    async (view: PageView, expectedPath: string) => {
+      try {
+        await flush();
+        if (current.current?.path === expectedPath)
+          patch(pageViewPatch(current.current, view));
+      } catch (e) {
+        report(e);
+      }
+    },
+    [flush, patch, report],
+  );
+  const patchNote = useCallback(
+    async (n: Note, value: Record<string, unknown>) => {
+      try {
+        await flush();
+        if (current.current?.path === n.path) {
+          patch(value);
+          await flush();
+        } else {
+          const d = await api.read(n.path);
+          const saved = await api.save(d, d.content, value);
+          if (current.current?.path === n.path && !dirty.current) accept(saved);
+          setTabs((t) => t.map((x) => (x.path === n.path ? saved : x)));
+          await refresh();
+        }
+      } catch (e) {
+        report(e);
+      }
+    },
+    [flush, patch, accept, refresh, report],
   );
   const install = useCallback((w: WorkspaceInfo) => {
     current.current = null;
@@ -365,6 +419,8 @@ export function useWorkspace() {
     openVault,
     change,
     patch,
+    patchNote,
+    setPageView,
     flush,
     refresh,
     accept,

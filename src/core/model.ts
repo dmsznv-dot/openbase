@@ -26,6 +26,39 @@ export interface DataView {
   sort: "title" | "updated";
   groupBy: string;
 }
+export interface PageView extends Omit<DataView, "id" | "name" | "layout"> {
+  layout: "text" | "table" | "cards" | "board";
+}
+const record = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+export function getPageView(note: Note): PageView {
+  const saved = record(record(note.properties.localnotes).page_view);
+  return {
+    layout: ["table", "cards", "board"].includes(String(saved.layout))
+      ? (saved.layout as PageView["layout"])
+      : "text",
+    tags: Array.isArray(saved.tags)
+      ? saved.tags.filter((t): t is string => typeof t === "string")
+      : [],
+    match: saved.match === "all" ? "all" : "any",
+    sort: saved.sort === "updated" ? "updated" : "title",
+    groupBy: "status",
+  };
+}
+export function pageViewPatch(
+  note: Note,
+  view: PageView,
+): Record<string, unknown> {
+  return {
+    localnotes: { ...record(note.properties.localnotes), page_view: view },
+  };
+}
+export function pageChildren(notes: Note[], parentId: string): Note[] {
+  return notes.filter((n) => n.parent_id === parentId && n.id !== parentId);
+}
 export interface GraphNode {
   id: string;
   label: string;

@@ -21,6 +21,7 @@ interface Props {
   onOpen: (n: Note) => void;
   onPatch: (n: Note, patch: Record<string, unknown>) => void;
   onCreate: () => void;
+  pageMode?: boolean;
 }
 const layouts = [
   ["table", "Таблица", Table2],
@@ -118,6 +119,7 @@ export function DataViews({
   onOpen,
   onPatch,
   onCreate,
+  pageMode = false,
 }: Props) {
   const [filters, setFilters] = useState(false),
     [search, setSearch] = useState("");
@@ -154,7 +156,7 @@ export function DataViews({
           <div className="row">
             <Network size={27} className="view-icon" />
             <input
-              aria-label="Название Data View"
+              aria-label={pageMode ? "Название страницы" : "Название Data View"}
               className="view-title"
               key={view.id}
               defaultValue={view.name}
@@ -164,7 +166,11 @@ export function DataViews({
               }}
             />
           </div>
-          <p>Страницы одного проекта. Все виды используют общий набор тегов.</p>
+          <p>
+            {pageMode
+              ? "Вложенные страницы. Текст и вложения доступны во вкладке «Текст»."
+              : "Страницы одного проекта. Все виды используют общий набор тегов."}
+          </p>
         </div>
         <button className="primary-button" onClick={onCreate}>
           <Plus size={16} />
@@ -172,20 +178,24 @@ export function DataViews({
         </button>
       </div>
       <div className="view-toolbar">
-        <div className="layout-tabs" role="tablist">
-          {layouts.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={view.layout === id}
-              className={view.layout === id ? "selected" : ""}
-              onClick={() => onView({ ...view, layout: id })}
-            >
-              <Icon size={16} />
-              {label}
-            </button>
-          ))}
-        </div>
+        {!pageMode ? (
+          <div className="layout-tabs" role="tablist">
+            {layouts.map(([id, label, Icon]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={view.layout === id}
+                className={view.layout === id ? "selected" : ""}
+                onClick={() => onView({ ...view, layout: id })}
+              >
+                <Icon size={16} />
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="muted page-view-label">Вложенные страницы</span>
+        )}
         <div className="row">
           <button
             className={"quiet-button " + (filters ? "selected" : "")}
@@ -278,7 +288,7 @@ export function DataViews({
               </button>
             ))
           ) : (
-            <span>Все страницы</span>
+            <span>{pageMode ? "Вложенные страницы" : "Все страницы"}</span>
           )}
           <span className="muted">
             {selected.length} {selected.length === 1 ? "страница" : "страниц"}
@@ -297,12 +307,26 @@ export function DataViews({
         <div className="empty-state">
           <Tag size={30} />
           <h2>Здесь пока нет страниц</h2>
-          <p>Добавьте выбранный тег к странице или измените фильтр.</p>
+          <p>
+            {pageMode
+              ? view.tags.length
+                ? "Измените фильтр или создайте вложенную страницу."
+                : "Создайте вложенную страницу — она появится во всех представлениях."
+              : "Добавьте выбранный тег к странице или измените фильтр."}
+          </p>
           <button
             className="quiet-button"
-            onClick={() => onView({ ...view, tags: [] })}
+            onClick={() =>
+              pageMode && !view.tags.length
+                ? onCreate()
+                : onView({ ...view, tags: [] })
+            }
           >
-            Показать все страницы
+            {pageMode
+              ? view.tags.length
+                ? "Сбросить фильтр"
+                : "Создать вложенную страницу"
+              : "Показать все страницы"}
           </button>
         </div>
       ) : view.layout === "table" ? (

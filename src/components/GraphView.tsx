@@ -1,39 +1,274 @@
-import { useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ReactFlow,
   Controls,
   MarkerType,
   Handle,
   Position,
+  useStore,
   type NodeProps,
   type Node,
+  type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Search, Tag, FileText } from "lucide-react";
+import { Search, Tag, FileText, Pause, Play } from "lucide-react";
 import { buildGraph, type Note } from "../core/model";
-function PageNode({
-  data,
-}: NodeProps<
-  Node<{ label: string; kind: string; dim: boolean; activate: () => void }>
->) {
+import { GraphPhysics } from "../core/graphPhysics";
+
+type BrainData = {
+  label: string;
+  kind: string;
+  dim: boolean;
+  activate: () => void;
+};
+const PageNode = memo(function PageNode({ data }: NodeProps<Node<BrainData>>) {
+  const zoom = useStore((s) => s.transform[2]);
   return (
     <button
-      onClick={(e) => {
-        e.stopPropagation();
-        data.activate();
-      }}
       className={"brain-node " + data.kind + (data.dim ? " dim" : "")}
+      onClick={(e) => {
+        if (e.detail === 0) {
+          e.stopPropagation();
+          data.activate();
+        }
+      }}
     >
       <Handle type="target" position={Position.Top} />
       <div className="brain-symbol">
         {data.kind === "tag" ? <Tag size={15} /> : <FileText size={17} />}
       </div>
-      <span>{data.label}</span>
+      <span
+        style={{
+          fontSize: (data.kind === "tag" ? 11 : 12) / Math.max(0.5, zoom),
+        }}
+      >
+        {data.label}
+      </span>
       <Handle type="source" position={Position.Bottom} />
     </button>
   );
-}
+});
 const nodeTypes = { brain: PageNode };
+
+type Graph = ReturnType<typeof buildGraph>;
+function GraphCanvas({
+  graph,
+  focused,
+  query,
+  onFocus,
+  onActivate,
+  physics,
+  topology,
+}: {
+  graph: Graph;
+  focused: string | null;
+  query: string;
+  physics: boolean;
+  topology: string;
+  onFocus: (id: string | null) => void;
+  onActivate: (id: string) => void;
+}) {
+  const [simulation] = useState(() => {
+    const sim = new GraphPhysics(
+      graph.nodes.map((n) => n.id),
+      graph.edges,
+    );
+    // Start from a readable layout, then let the last movement settle visibly.
+    for (let i = 0; i < 100; i++) sim.step();
+    return sim;
+  });
+  const [positions, setPositions] = useState(() => simulation.positions());
+  const [measurements, setMeasurements] = useState(
+    new Map<string, { width: number; height: number }>(),
+  );
+  const wake = useRef<() => void>(() => {});
+  const lastTopology = useRef(topology);
+  useLayoutEffect(() => {
+    if (lastTopology.current === topology) return;
+    lastTopology.current = topology;
+    simulation.reconcile(
+      graph.nodes.map((n) => n.id),
+      graph.edges,
+    );
+    setPositions(simulation.positions());
+    wake.current();
+  }, [graph, simulation, topology]);
+  useEffect(() => {
+    if (!physics) {
+      wake.current = () => {};
+      return;
+    }
+    let frame = 0,
+      last = 0;
+    const tick = (time: number) => {
+      frame = 0;
+      if (document.hidden) return;
+      if (time - last < 1000 / 60) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      last = time;
+      const moving = simulation.step();
+      setPositions(simulation.positions());
+      if (moving) frame = requestAnimationFrame(tick);
+    };
+    const start = () => {
+      if (!frame && !document.hidden) frame = requestAnimationFrame(tick);
+    };
+    wake.current = start;
+    const visibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      } else start();
+    };
+    document.addEventListener("visibilitychange", visibility);
+    start();
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", visibility);
+      wake.current = () => {};
+    };
+  }, [simulation, physics]);
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const dimensions = changes.filter(
+        (c) => c.type === "dimensions" && c.dimensions,
+      );
+      if (dimensions.length)
+        setMeasurements((previous) => {
+          const next = new Map(previous);
+          let changed = false;
+          for (const c of dimensions) {
+            if (c.type !== "dimensions" || !c.dimensions) continue;
+            const old = previous.get(c.id);
+            if (
+              old?.width !== c.dimensions.width ||
+              old?.height !== c.dimensions.height
+            ) {
+              next.set(c.id, c.dimensions);
+              changed = true;
+            }
+          }
+          return changed ? next : previous;
+        });
+      let changed = false;
+      for (const change of changes) {
+        if (change.type !== "position" || !change.position) continue;
+        simulation.hold(change.id, change.position.x, change.position.y);
+        if (!change.dragging) simulation.release(change.id);
+        changed = true;
+      }
+      if (changed) {
+        setPositions(simulation.positions());
+        wake.current();
+      }
+    },
+    [simulation],
+  );
+  const baseNodes = useMemo(() => {
+    const neighbors = new Set(
+      focused
+        ? [
+            focused,
+            ...graph.edges
+              .filter((e) => e.source === focused || e.target === focused)
+              .flatMap((e) => [e.source, e.target]),
+          ]
+        : [],
+    );
+    return graph.nodes.map((n) => ({
+      id: n.id,
+      type: "brain",
+      data: {
+        label: n.label,
+        kind: n.kind,
+        activate: () => onActivate(n.id),
+        dim:
+          (!!query && !n.label.toLowerCase().includes(query.toLowerCase())) ||
+          (!!focused && !neighbors.has(n.id)),
+      },
+    }));
+  }, [graph, focused, query, onActivate]);
+  const nodes = useMemo(
+    () =>
+      baseNodes.map((n) => ({
+        ...n,
+        measured: measurements.get(n.id),
+        position: positions.get(n.id) ?? { x: 0, y: 0 },
+      })),
+    [baseNodes, positions, measurements],
+  );
+  const edges = useMemo(
+    () =>
+      graph.edges.map((e) => ({
+        ...e,
+        type: "straight",
+        animated: false,
+        style: {
+          stroke: e.kind === "tag" ? "var(--graph-tag)" : "var(--graph-link)",
+          strokeWidth: e.kind === "tag" ? 1 : 1.4,
+          strokeDasharray: e.kind === "tag" ? "4 5" : undefined,
+          opacity:
+            focused && e.source !== focused && e.target !== focused
+              ? 0.12
+              : 0.6,
+        },
+        markerEnd:
+          e.kind === "link"
+            ? {
+                type: MarkerType.ArrowClosed,
+                color: "var(--graph-link)",
+                width: 12,
+                height: 12,
+              }
+            : undefined,
+      })),
+    [graph, focused],
+  );
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      fitView
+      fitViewOptions={{ padding: 0.35, maxZoom: 1.25 }}
+      minZoom={0.08}
+      maxZoom={3}
+      onNodesChange={onNodesChange}
+      nodesDraggable
+      nodesConnectable={false}
+      nodeDragThreshold={4}
+      nodeClickDistance={4}
+      deleteKeyCode={null}
+      onNodeDragStart={(_, n) => {
+        simulation.hold(n.id, n.position.x, n.position.y);
+        wake.current();
+      }}
+      onNodeDragStop={(_, n) => {
+        simulation.hold(n.id, n.position.x, n.position.y);
+        simulation.release(n.id);
+        wake.current();
+      }}
+      onPaneClick={() => onFocus(null)}
+      onNodeClick={(_, n) => onActivate(n.id)}
+      onNodeMouseEnter={(_, n) => onFocus(n.id)}
+      onNodeMouseLeave={() => onFocus(null)}
+      proOptions={{ hideAttribution: false }}
+    >
+      <Controls showInteractive={false} />
+    </ReactFlow>
+  );
+}
+
 export default function GraphView({
   notes,
   allNotes,
@@ -46,93 +281,36 @@ export default function GraphView({
   onTag: (tag: string) => void;
 }) {
   const [showTags, setShowTags] = useState(true),
-    [query, setQuery] = useState(""),
-    [focused, setFocused] = useState<string | null>(null);
+    [query, setQuery] = useState("");
+  const [focused, setFocused] = useState<string | null>(null);
+  const [physics, setPhysics] = useState(
+    () => !matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    const media = matchMedia("(prefers-reduced-motion: reduce)");
+    const change = () => setPhysics(!media.matches);
+    media.addEventListener("change", change);
+    return () => media.removeEventListener("change", change);
+  }, []);
   const graph = useMemo(
     () => buildGraph(notes.slice(0, 500), showTags, allNotes),
     [notes, allNotes, showTags],
   );
-  const { nodes, edges } = useMemo(() => {
-    const tagNodes = graph.nodes.filter((n) => n.kind === "tag");
-    const pages = graph.nodes.filter((n) => n.kind === "page");
-    const neighbor = new Set(
-      focused
-        ? [
-            focused,
-            ...graph.edges
-              .filter((e) => e.source === focused || e.target === focused)
-              .flatMap((e) => [e.source, e.target]),
-          ]
-        : [],
-    );
-    const positions = new Map<string, { x: number; y: number }>();
-    const radius = Math.max(190, pages.length * 30);
-    const ranked = [...tagNodes].sort(
-      (a, b) =>
-        graph.edges.filter((e) => e.target === b.id).length -
-        graph.edges.filter((e) => e.target === a.id).length,
-    );
-    ranked.forEach((n, i) => {
-      const angle =
-        ((i - 1) / Math.max(ranked.length - 1, 1)) * Math.PI * 2 + 0.45;
-      positions.set(
-        n.id,
-        i === 0
-          ? { x: 450, y: 350 }
-          : {
-              x: 450 + Math.cos(angle) * (radius + 185),
-              y: 350 + Math.sin(angle) * (radius + 185),
-            },
-      );
-    });
-    pages.forEach((n, i) => {
-      const angle = (i / Math.max(pages.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      positions.set(n.id, {
-        x: 450 + Math.cos(angle) * radius,
-        y: 350 + Math.sin(angle) * radius,
-      });
-    });
-    return {
-      nodes: graph.nodes.map((n) => ({
-        id: n.id,
-        type: "brain",
-        position: positions.get(n.id)!,
-        data: {
-          label: n.label,
-          kind: n.kind,
-          activate: () => {
-            if (n.kind === "tag") onTag(n.id.slice(4));
-            else if (n.note) onOpen(n.note);
-          },
-          dim:
-            (!!query && !n.label.toLowerCase().includes(query.toLowerCase())) ||
-            (!!focused && !neighbor.has(n.id)),
-        },
-      })),
-      edges: graph.edges.map((e) => ({
-        ...e,
-        animated: false,
-        style: {
-          stroke: e.kind === "tag" ? "var(--graph-tag)" : "var(--graph-link)",
-          strokeWidth: e.kind === "tag" ? 1.2 : 1.7,
-          strokeDasharray: e.kind === "tag" ? "4 5" : undefined,
-          opacity:
-            focused && !neighbor.has(e.source) && !neighbor.has(e.target)
-              ? 0.12
-              : 0.65,
-        },
-        markerEnd:
-          e.kind === "link"
-            ? {
-                type: MarkerType.ArrowClosed,
-                color: "var(--graph-link)",
-                width: 14,
-                height: 14,
-              }
-            : undefined,
-      })),
-    };
-  }, [graph, focused, query, onOpen, onTag]);
+  // Polling, search and hover update labels/styles without resetting positions or the viewport.
+  const topology = JSON.stringify([
+    graph.nodes.map((n) => n.id).sort(),
+    graph.edges.map((e) => e.id).sort(),
+  ]);
+  const activate = useCallback(
+    (id: string) => {
+      if (id.startsWith("tag:")) onTag(id.slice(4));
+      else {
+        const n = notes.find((n) => n.id === id);
+        if (n) onOpen(n);
+      }
+    },
+    [notes, onOpen, onTag],
+  );
   return (
     <div className="graph-container">
       <div className="graph-top">
@@ -145,39 +323,34 @@ export default function GraphView({
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
-        <label className="row graph-toggle">
-          <input
-            type="checkbox"
-            checked={showTags}
-            onChange={(e) => setShowTags(e.target.checked)}
-          />
-          Узлы тегов
-        </label>
+        <div className="row">
+          <button
+            className="graph-motion quiet-button"
+            aria-label={physics ? "Приостановить физику" : "Включить физику"}
+            onClick={() => setPhysics((s) => !s)}
+          >
+            {physics ? <Pause size={14} /> : <Play size={14} />}
+            {physics ? "Пауза" : "Физика"}
+          </button>
+          <label className="row graph-toggle">
+            <input
+              type="checkbox"
+              checked={showTags}
+              onChange={(e) => setShowTags(e.target.checked)}
+            />
+            Узлы тегов
+          </label>
+        </div>
       </div>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.3, maxZoom: 1.25 }}
-        minZoom={0.08}
-        maxZoom={3}
-        nodesDraggable={false}
-        onPaneClick={() => setFocused(null)}
-        onNodeClick={(_, node) => {
-          if (node.id.startsWith("tag:")) {
-            onTag(node.id.slice(4));
-            return;
-          }
-          const n = notes.find((n) => n.id === node.id);
-          if (n) onOpen(n);
-        }}
-        onNodeMouseEnter={(_, node) => setFocused(node.id)}
-        onNodeMouseLeave={() => setFocused(null)}
-        proOptions={{ hideAttribution: false }}
-      >
-        <Controls showInteractive={false} />
-      </ReactFlow>
+      <GraphCanvas
+        topology={topology}
+        graph={graph}
+        focused={focused}
+        query={query}
+        physics={physics}
+        onFocus={setFocused}
+        onActivate={activate}
+      />
       <div className="graph-legend">
         <span>
           <i className="legend-line" />
@@ -190,6 +363,9 @@ export default function GraphView({
         <span>
           {notes.length} страниц ·{" "}
           {graph.edges.filter((e) => e.kind === "link").length} ссылок
+        </span>
+        <span className="graph-drag-hint">
+          Тяните узлы, чтобы перемещать связи
         </span>
       </div>
       {notes.length > 500 ? (

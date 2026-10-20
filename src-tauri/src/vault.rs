@@ -1111,6 +1111,53 @@ mod tests {
         assert_eq!(v.read("old.md").unwrap().tags, vec!["project"]);
     }
     #[test]
+    fn page_views_preserve_markdown_attachments_and_parent_after_reopening() {
+        let (dir, mut v) = vault();
+        let parent = v.create("Проект", Some("root".into())).unwrap();
+        let child = v.create("Задача", Some(parent.id.clone())).unwrap();
+        let media = b"original attachment bytes";
+        fs::create_dir_all(dir.path().join("Вложения")).unwrap();
+        fs::write(dir.path().join("Вложения/brief.pdf"), media).unwrap();
+        let content = "# Описание\n\n[Бриф](Вложения/brief.pdf)\n\nТекст проекта.";
+        let mut page = v
+            .save(&parent.path, &parent.revision, content, None)
+            .unwrap();
+        for layout in ["table", "board", "cards", "text"] {
+            page = v.save(&page.path, &page.revision, &page.content,
+                Some(json!({"localnotes": {"page_view": {
+                    "layout": layout, "tags": [], "match": "any", "sort": "title", "groupBy": "status"
+                }}}))).unwrap();
+        }
+        page = v
+            .save(
+                &page.path,
+                &page.revision,
+                &page.content,
+                Some(json!({"localnotes": {"favorite": true}})),
+            )
+            .unwrap();
+        let path = page.path.clone();
+        drop(v);
+        let v = Vault::open(dir.path(), &dir.path().join("index.sqlite")).unwrap();
+        let reopened = v.read(&path).unwrap();
+        assert_eq!(reopened.content, content);
+        assert_eq!(reopened.id, parent.id);
+        assert_eq!(reopened.parent_id.as_deref(), Some("root"));
+        assert!(reopened.favorite);
+        assert_eq!(
+            reopened.properties["localnotes"]["page_view"]["layout"],
+            "text"
+        );
+        assert_eq!(
+            v.read(&child.path).unwrap().parent_id.as_deref(),
+            Some(parent.id.as_str())
+        );
+        assert_eq!(
+            fs::read(dir.path().join("Вложения/brief.pdf")).unwrap(),
+            media
+        );
+    }
+    #[test]
     fn traversal_and_escaping_symlinks_are_rejected() {
         let (dir, v) = vault();
         assert!(v.read("../outside.md").is_err());
