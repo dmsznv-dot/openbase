@@ -36,6 +36,8 @@ import {
   Plus,
   Image as ImageIcon,
   GripVertical,
+  FilePlus2,
+  FileText,
 } from "lucide-react";
 import type { Document, Note } from "../core/model";
 import { api, assetUrl, native } from "../core/bridge";
@@ -51,6 +53,7 @@ interface Props {
   onError: (e: unknown) => void;
   onHistory: () => void;
   onMove: (path: string) => Promise<void>;
+  onCreateChild: () => void;
 }
 const unsupported = (s: string) =>
   /\[\^[^\]]+\]|^\s*<(?!\/?(?:details|summary|div|p|strong|em|br|s|code)\b)[a-z!]|^\s*<!--|^:::/im.test(
@@ -67,6 +70,7 @@ export function Editor({
   onError,
   onHistory,
   onMove,
+  onCreateChild,
 }: Props) {
   const [source, setSource] = useState(!!doc.yaml_error || unsupported(draft)),
     [slash, setSlash] = useState<string | null>(null),
@@ -260,6 +264,7 @@ export function Editor({
     };
   }, []);
   const commands = [
+    { name: "Подстраница", icon: FilePlus2, run: onCreateChild },
     {
       name: "Заголовок 1",
       icon: Heading1,
@@ -727,6 +732,19 @@ export function Editor({
               </div>
             ))}
           </div>
+        ) : null}
+        {notes.some((n) => n.parent_id === doc.id && n.id !== doc.id) ? (
+          <section className="subpages" aria-label="Вложенные страницы">
+            <h2>Вложенные страницы</h2>
+            {notes
+              .filter((n) => n.parent_id === doc.id && n.id !== doc.id)
+              .map((n) => (
+                <button key={n.path} onClick={() => onOpen(n)}>
+                  <FileText size={16} />
+                  {n.title}
+                </button>
+              ))}
+          </section>
         ) : null}
         <div className="backlinks">
           <span>Обратные ссылки</span>

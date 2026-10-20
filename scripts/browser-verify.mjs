@@ -40,6 +40,30 @@ page.on("pageerror", (e) => errors.push(e.message));
 const results = [];
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/?demo`);
+  assert.equal(
+    await page.getByText("Хранится на вашем Mac", { exact: true }).count(),
+    0,
+  );
+  await page
+    .getByRole("button", { name: "Свернуть боковое меню", exact: true })
+    .click();
+  assert.equal(await page.locator(".sidebar").count(), 0);
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Развернуть боковое меню", exact: true })
+    .waitFor();
+  assert.equal(await page.locator(".sidebar").count(), 0);
+  assert.equal((await page.locator(".main-panel").boundingBox()).x, 0);
+  await page.screenshot({
+    path: root + "/artifacts/sidebar-collapsed-v0.2.1.png",
+  });
+  await page
+    .getByRole("button", { name: "Развернуть боковое меню", exact: true })
+    .click();
+  await page.locator(".sidebar").waitFor();
+  results.push(
+    "sidebar collapses, restores and persists across reload; footer indicator removed",
+  );
   const materialsRow = page
     .locator(".page-tree .sidebar-page-row")
     .filter({ hasText: "Материалы" });
@@ -93,6 +117,31 @@ try {
     .locator(".page-tree")
     .getByRole("button", { name: "Проект светильника", exact: true })
     .click();
+  const initialEditor = page.getByRole("textbox", {
+    name: "Содержимое страницы",
+    exact: true,
+  });
+  await initialEditor.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/");
+  await page
+    .getByRole("menuitem", { name: "Подстраница", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Название страницы", exact: true })
+    .fill("Задача проекта");
+  await page
+    .locator(".page-tree")
+    .getByRole("button", { name: "Проект светильника", exact: true })
+    .click();
+  await page
+    .locator(".subpages")
+    .getByRole("button", { name: "Задача проекта", exact: true })
+    .waitFor();
+  results.push(
+    "slash command creates a child under the current page and parent displays its link",
+  );
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
   const parentSource = page.getByRole("textbox", {
     name: "Исходный Markdown",
@@ -102,14 +151,27 @@ try {
     (await parentSource.inputValue()) +
     "\n\n[Бриф](Вложения/brief.pdf)\n\nСохранить при смене вида.";
   await parentSource.fill(parentContent);
+  assert.doesNotMatch(parentContent, /(?:^|\n)\/\s*$/);
+  await page
+    .getByRole("button", { name: "Свернуть боковое меню", exact: true })
+    .click();
+  await page.setViewportSize({ width: 900, height: 620 });
+  assert.equal(await parentSource.inputValue(), parentContent);
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+    false,
+  );
+  await page
+    .getByRole("button", { name: "Развернуть боковое меню", exact: true })
+    .click();
+  await page.setViewportSize({ width: 1320, height: 860 });
   await page.getByRole("tab", { name: "Таблица", exact: true }).click();
   await page
-    .locator(".page-workspace")
-    .getByRole("button", { name: "Новая страница", exact: true })
+    .locator(".table-title")
+    .getByText("Задача проекта", { exact: true })
     .click();
-  await page
-    .getByRole("textbox", { name: "Название страницы", exact: true })
-    .fill("Задача проекта");
   await page
     .locator(".page-tree")
     .getByRole("button", { name: "Проект светильника", exact: true })

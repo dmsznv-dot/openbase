@@ -8,7 +8,6 @@ import {
   Trash2,
   Network,
   FileText,
-  FolderOpen,
   ChevronDown,
   Star,
   MoreHorizontal,
@@ -235,11 +234,6 @@ export function Sidebar({
           <Trash2 size={16} />
           Корзина
         </button>
-        <div className="local-indicator">
-          <span />
-          Хранится на вашем Mac
-          <FolderOpen size={13} />
-        </div>
       </footer>
       {menu && menuNote ? (
         <PageMenu

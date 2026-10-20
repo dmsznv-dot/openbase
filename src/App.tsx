@@ -13,6 +13,8 @@ import {
   AlertCircle,
   ArrowUpRight,
   BookOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { Editor } from "./components/Editor";
@@ -28,12 +30,21 @@ export default function App() {
   const [screen, setScreen] = useState("page"),
     [viewId, setViewId] = useState("all"),
     [search, setSearch] = useState(false),
+    [sidebarCollapsed, setSidebarCollapsed] = useState(
+      () => localStorage.getItem("localnotes-sidebar-collapsed") === "true",
+    ),
     [theme, setTheme] = useState(
       () => localStorage.getItem("localnotes-theme") ?? "system",
     ),
     [history, setHistory] = useState<HistoryEntry[] | null>(null),
     [trash, setTrash] = useState<TrashEntry[]>([]);
   const activeView = w.views.find((v) => v.id === viewId) ?? w.views[0];
+  useEffect(() => {
+    localStorage.setItem(
+      "localnotes-sidebar-collapsed",
+      String(sidebarCollapsed),
+    );
+  }, [sidebarCollapsed]);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const apply = () =>
@@ -140,30 +151,55 @@ export default function App() {
   };
   const isConflict = w.status === "Конфликт";
   return (
-    <div className="app-shell">
-      <Sidebar
-        root={w.workspace?.root ?? ""}
-        notes={w.notes}
-        views={w.views}
-        current={w.doc?.path}
-        screen={screen}
-        activeView={activeView?.id ?? ""}
-        onOpen={(n) => void open(n)}
-        onScreen={(s) => void go(s)}
-        onView={(v) => void openView(v)}
-        onCreate={() => void create()}
-        onNewView={() => void newView()}
-        onOpenVault={() => void w.openVault()}
-        onSearch={() => setSearch(true)}
-        onRename={(n, title) => void patchNote(n, { title })}
-        onFavorite={(n) =>
-          void patchNote(n, { localnotes: { favorite: !n.favorite } })
-        }
-        onRemove={(n) => void w.remove(n)}
-      />
+    <div
+      className={"app-shell" + (sidebarCollapsed ? " sidebar-collapsed" : "")}
+    >
+      {!sidebarCollapsed ? (
+        <Sidebar
+          root={w.workspace?.root ?? ""}
+          notes={w.notes}
+          views={w.views}
+          current={w.doc?.path}
+          screen={screen}
+          activeView={activeView?.id ?? ""}
+          onOpen={(n) => void open(n)}
+          onScreen={(s) => void go(s)}
+          onView={(v) => void openView(v)}
+          onCreate={() => void create()}
+          onNewView={() => void newView()}
+          onOpenVault={() => void w.openVault()}
+          onSearch={() => setSearch(true)}
+          onRename={(n, title) => void patchNote(n, { title })}
+          onFavorite={(n) =>
+            void patchNote(n, { localnotes: { favorite: !n.favorite } })
+          }
+          onRemove={(n) => void w.remove(n)}
+        />
+      ) : null}
       <main className="main-panel">
         <header className="topbar" data-tauri-drag-region>
           <div className="breadcrumb">
+            <button
+              className="icon-button sidebar-toggle"
+              aria-label={
+                sidebarCollapsed
+                  ? "Развернуть боковое меню"
+                  : "Свернуть боковое меню"
+              }
+              title={
+                sidebarCollapsed
+                  ? "Развернуть боковое меню"
+                  : "Свернуть боковое меню"
+              }
+              aria-expanded={!sidebarCollapsed}
+              onClick={() => setSidebarCollapsed((s) => !s)}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen size={18} />
+              ) : (
+                <PanelLeftClose size={18} />
+              )}
+            </button>
             <span>
               {w.workspace?.root.split("/").pop() ?? "Ваше пространство"}
             </span>
@@ -397,6 +433,7 @@ export default function App() {
                 onOpen={(n) => void open(n)}
                 onError={w.report}
                 onHistory={() => void showHistory()}
+                onCreateChild={() => void create(w.doc!.id)}
                 onMove={async (path) => {
                   await w.flush();
                   const d = await api.read(w.doc!.path);
