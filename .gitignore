@@ -6,3 +6,4 @@ src-tauri/target/
 artifacts/
 *.log
 .DS_Store
+*.tsbuildinfo
